@@ -1,6 +1,8 @@
 # redmine-yolo
 Ugly but practical redmine issues tracking tools. Intended to be as light as possible with no hosting constraints and being hosting on my Microsoft OneDrive.
 
+![overview](https://raw.githubusercontent.com/camous/redmine-yolo/master/doc/screenshot1.png)
+
 ## WHY ?
 I'm an heavy user of redmine on my daily job either for pure technical tasks or organization ones. However the default views & UI provided by redmine missed some features for me.
 
@@ -47,7 +49,8 @@ var activities = {
 };
 ```
 
-Unfortunately, redmine doesn't provide a REST API for getting the list of activities (defined at project level) per project, requiring to declare activities per project.
+Unfortunately, redmine doesn't provide a REST API for getting the list of activities (defined at project level) per project, requiring to declare activities per project. You can easily find your projetc ID with another redmine REST API call.
+https://redmine.domain.com/enumerations/projects.json?key=YOU_API_KEY
 
 settings.js
 ```javascript
