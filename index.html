@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+
+<script type='text/javascript'>
+	var redmineBaseUri = 'REDMINE URL';
+	var apiRestLimit = 100;
+	var apiKey = 'API REST KEY';
+</script>
+
+<html>
+<head>
+	<link rel="shortcut icon" href="favicon.ico" />
+	<script type='text/javascript' src='http://ajax.aspnetcdn.com/ajax/knockout/knockout-3.0.0.js'></script>
+	<script type='text/javascript' src='http://ajax.aspnetcdn.com/ajax/jQuery/jquery-2.1.1.js'></script>
+	<script type='text/javascript' src='jquery.hotkeys.js' />
+    <script type="text/javascript" src="md5.js"></script>
+	<script type='text/javascript'>
+		$.support.cors = true;
+	</script>
+	<script type='text/javascript' src='http://cdnjs.cloudflare.com/ajax/libs/moment.js/2.7.0/moment.js'></script>
+	<script type='text/javascript' src='http://code.highcharts.com/highcharts.js'></script>
+	<script type='text/javascript' src="./customEvents.js"></script>
+	<script type='text/javascript' src='settings.js'></script>
+	<script type='text/javascript' src='issuesViewModel.js'></script>
+	<link rel="stylesheet" type="text/css" href="application.css">
+	<title>Redmine YOLO</title>
+</head>
+<body>
+<div id="settings_help" style="display:none;">
+	<ul>
+		<li><kbd>TAB</kbd> Open redmine search with current search terms</li>
+		<li><kbd>CTRL</kbd> + <kbd>R</kbd> Refresh issues list & chart</li>
+		<li><kbd>CTRL</kbd> + <kbd>F</kbd> Focus search input</li>
+		<li><kbd>CTRL</kbd> + <kbd>X</kbd> Reset search input & chart filter</li>
+		<li><kbd>CTRL</kbd> + <kbd>1 ... 9</kbd> Open first 10 issues in redmine</li>
+		<li>Double click on chart legend will create a new ticket in redmine</li>
+		<li>Left click will filter only this project</li>
+	</ul>
+</div>
+	
+<form action="#">
+	<input placeholder="Search ..." type="search" id="q" name="q" data-bind="value: query, valueUpdate: 'keyup'" autocomplete="off"> <span data-bind="text : (model.filteredIssues().length + ' out ' + model.issues().length + ' issues')"></span> | 
+	<a onclick="window.open(redmineBaseUri + 'activity')" href="#">all activities</a> | 
+	<a onclick="window.open(redmineBaseUri + 'time_entries?utf8=%E2%9C%93&f%5B%5D=spent_on&op%5Bspent_on%5D=*&f%5B%5D=user_id&op%5Buser_id%5D=%3D&v%5Buser_id%5D%5B%5D=me&f%5B%5D=&c%5B%5D=project&c%5B%5D=spent_on&c%5B%5D=user&c%5B%5D=activity&c%5B%5D=issue&c%5B%5D=comments&c%5B%5D=hours')" href="#">spent times</a> | 
+	<a href="#" onclick="toggle_visibility('settings_help');">help</a> | 
+	<a href="#" onclick="refreshYoloData();">refresh</a>
+	<input style="float :right"  type="date" name="d" data-bind="value : date"/>
+</form>
+
+<div id="container" style="min-width: 310px; width: auto;height: 200px; margin: 0 auto"></div>
+ 
+<table>
+	<tr data-bind="visible : model.filteredIssues().length == 0">
+		<td colspan="7">
+			Search for <b><span data-bind="text : query"></span></b> on redmine (tab key).
+		</td>
+	</tr>
+	<tr data-bind="visible : model.visibleProjects().length == 1 && model.filteredIssues().length > 0">
+		<td colspan="7">
+			Enter log time for <span data-bind='text:  model.visibleProjects()'></span>
+			<!-- ko foreach: model.projectActivities -->
+			<div>
+				<div data-bind="text: name" style="display:inline-block; width : 150px"></div>
+					<div style="display:inline;">
+						<button data-bind="click : $parent.addProjectLog.bind($data,model.projectId(),1)">+1</button>
+						<button data-bind="click : $parent.addProjectLog.bind($data,model.projectId(),2)">+2</button>
+						<button data-bind="click : $parent.addProjectLog.bind($data,model.projectId(),3)">+3</button>
+						<button data-bind="click : $parent.addProjectLog.bind($data,model.projectId(),4)">+4</button>
+					</div>
+			</div>	
+			<!-- /ko -->
+			<input type="text" placeholder="Enter comment" data-bind="value: projectComment" /><br />
+		</td>
+	</tr>
+    <tbody data-bind="foreach: model.filteredIssues">
+        <tr>
+			<td data-bind="text: ($index()+1) <= 10 ? ($index()+1) : '&nbsp;'"></td>
+            <td><a data-bind="attr : { href : redmineBaseUri + 'issues/' + id,title : subject}, text : id "/></td>
+			<td data-bind="text: assignee"></td>
+            <td><a data-bind="attr : { title : subject}, text : subject, click : $parent.selectIssue "/></td>
+			<td><div style="border-radius: 50%/50%;width: 12px;height: 12px;" data-bind="style : { background : color }"></div></td>
+			<td data-bind="text: project.name"></td>
+			<td data-bind="text: moment(updated_on).fromNow()"></td>
+			<td data-bind="text: status"></td>
+        </tr>
+		<tr data-bind="visible : isActivitiesVisible">
+			<td colspan="7">
+				<!-- ko foreach: activities -->
+				<div>
+					<div data-bind="text: name" style="display:inline-block; width : 150px"></div>
+						<div style="display:inline;">
+							<button data-bind="click : $parents[1].addLog.bind($data,$parent,1)">+1</button>
+							<button data-bind="click : $parents[1].addLog.bind($data,$parent,2)">+2</button>
+							<button data-bind="click : $parents[1].addLog.bind($data,$parent,3)">+3</button>
+							<button data-bind="click : $parents[1].addLog.bind($data,$parent,4)">+4</button>
+						</div>
+						<div style="display : inline-block;" data-bind="text: sum, visible : sum() > 0, style : { background : color, width : (sum() * 20) + 'px'}"></div>
+				</div>	
+				<!-- /ko -->
+				<input type="text" placeholder="Enter comment" data-bind="value: comment" /><br />
+				<a data-bind="visible: deferredAddingLog, attr : { title : subject}, text : 'cancel adding log time ', click : $parent.cancelLog.bind($data,deferredAddingLog)"/>
+			</td>
+		</tr>
+    </tbody>
+
+</table>
+</body>
+
+<script type='text/javascript'>
+
+function drawChart(){
+	$('#container').highcharts({
+	chart: {
+	    type: 'column',
+		backgroundColor:'rgba(255, 255, 255, 0.1)'
+	},
+	title: {
+	    text : ''
+	},
+	events: {
+		load: function () {
+	    	//add report div
+	       	var ch = this,
+	            x = 20,
+	            y = 57;
+	        
+	        ch.flashText = ch.renderer.text('<div id="flash"><div id="report"></div></div>', x , y +10, true).attr({
+	            zIndex: 101
+	        }).add();
+		}
+	},
+	legend : {
+		itemEvents: {
+	    	dblclick: function (event) {
+				var found = false;
+				
+				jQuery.each(projectsInfo, function(id, value) {
+					if(value.name == event.target.innerHTML)
+					{
+						window.open(redmineBaseUri + 'projects/' + id + '/issues/new','_blank');
+						found = true;
+					}
+				});
+	
+				// let's do something if not found
+				if(!found)
+					alert('Project named ' + event.target.innerHTML + ' not configured in settings.js');
+				
+				event.preventDefault();
+				return false;
+	    	}
+		}
+	},
+	credits : {
+		enabled : false
+	},
+	plotOptions: {
+	    series: {
+	        stacking: 'normal',
+			pointWidth: 20,
+			animation: false,
+			point : {
+				events : {
+                	click: function (event) {
+                    	console.log(event);
+                    }
+				}
+			},
+			events: {
+				legendItemClick: function(event){
+					
+					var seriesIndex = this.index;
+	                var series = this.chart.series;
+	
+	                for (var i = 0; i < series.length; i++) {
+	                    // rather than calling 'show()' and 'hide()' on the series', we use setVisible and then
+	                    // call chart.redraw --- this is significantly faster since it involves fewer chart redraws
+	                    if (series[i].index === seriesIndex) {
+	                        if (!series[i].visible) series[i].setVisible(true, false);
+	                    } else {
+	                        if (series[i].visible) series[i].setVisible(false, false);
+	                    }
+	                }
+	                this.chart.redraw();
+					
+					model.forceVisibleProjectsDummy.notifySubscribers();
+					
+					return false;
+				}
+			}
+	    }
+	},
+	xAxis: {
+		type: 'datetime',
+	    tickPositioner: function() {
+	        var ticks = [];
+	        $.each(this.series, function (index ,value) {
+	           ticks = ticks.concat(value.xData);
+	        });              
+	        return   ticks;
+	    },
+	    labels: {
+			rotation : 25,
+	        formatter: function() {
+	            return Highcharts.dateFormat('%a %d', this.value);
+	       }
+	    }
+	},
+	yAxis: {
+		labels: {
+			enabled : false
+			},
+		title: {
+	        text: null
+	    },
+		stackLabels: {
+	        enabled: true,
+	        style: {
+	            fontWeight: 'bold',
+	            color: (Highcharts.theme && Highcharts.theme.textColor) || 'gray'
+	        }
+	    }
+	}
+	});
+}
+
+jQuery(document).ready(function () {
+	
+	var searchInput = document.getElementById('q'); 
+	
+	// open current search directly into redmine
+	$(document).bind('keydown', 'tab', function () {
+		window.open(redmineBaseUri + 'search?utf8=%E2%9C%93&q=' + document.getElementById('q').value,'_blank');
+		return false;
+	});
+
+	// clean filter
+	$(document).bind('keydown', 'ctrl+x', function () {
+		searchInput.value = '';
+		
+		chart = $('#container').highcharts();
+		var series = chart.series;
+		for (var i = 0; i < series.length; i++) {
+			series[i].setVisible(true, false);
+		}
+
+		chart.redraw();
+		model.forceVisibleProjectsDummy.notifySubscribers();
+		return false;
+	});
+	
+	// focus on search (overriding chrome search)
+	$(document).bind('keydown', 'ctrl+f', function () {
+
+		searchInput.focus();
+		searchInput.setSelectionRange(0, searchInput.value.length)
+		return false;
+	});
+	
+	// refresh issues
+	$(document).bind('keydown', 'ctrl+r', function () {
+		refreshYoloData();
+		return false;
+	});
+	
+	// open issue in the first 10 ones
+	// hotkey for ctrl+1, ctrl+2 .... ctrl+0, I'm too bad in js for understanding loop & closure ... 
+	$(document).bind('keydown', 'ctrl+1', function () { window.open(redmineBaseUri + 'issues/' + model.filteredIssues()[0].id,'_blank'); return false;	});
+	$(document).bind('keydown', 'ctrl+2', function () { window.open(redmineBaseUri + 'issues/' + model.filteredIssues()[1].id,'_blank'); return false;	});
+	$(document).bind('keydown', 'ctrl+3', function () { window.open(redmineBaseUri + 'issues/' + model.filteredIssues()[2].id,'_blank'); return false;	});
+	$(document).bind('keydown', 'ctrl+4', function () { window.open(redmineBaseUri + 'issues/' + model.filteredIssues()[3].id,'_blank'); return false;	});
+	$(document).bind('keydown', 'ctrl+5', function () { window.open(redmineBaseUri + 'issues/' + model.filteredIssues()[4].id,'_blank'); return false;	});
+	$(document).bind('keydown', 'ctrl+6', function () { window.open(redmineBaseUri + 'issues/' + model.filteredIssues()[5].id,'_blank'); return false;	});
+	$(document).bind('keydown', 'ctrl+7', function () { window.open(redmineBaseUri + 'issues/' + model.filteredIssues()[6].id,'_blank'); return false;	});
+	$(document).bind('keydown', 'ctrl+8', function () { window.open(redmineBaseUri + 'issues/' + model.filteredIssues()[7].id,'_blank'); return false;	});
+	$(document).bind('keydown', 'ctrl+9', function () { window.open(redmineBaseUri + 'issues/' + model.filteredIssues()[8].id,'_blank'); return false;	});
+	$(document).bind('keydown', 'ctrl+0', function () { window.open(redmineBaseUri + 'issues/' + model.filteredIssues()[9].id,'_blank'); return false;	});
+});
+
+var model = issuesViewModel();
+ko.applyBindings(model);
+
+function loadYoloData ()
+{
+	model.loadIssues(redmineBaseUri + "issues.json?key=" + apiKey + "&query_id=50");
+	model.loadIssues(redmineBaseUri + "issues.json?key=" + apiKey + "&assigned_to_id=me");
+	model.loadTimeLogs(redmineBaseUri + "time_entries.json?key=" + apiKey + "&user_id=me&spent_on=%3E%3D" + moment().subtract('months', 1.5).format('YYYY-MM-DD'));
+}
+
+function refreshYoloData()
+{
+	console.log("refresh yolo data");
+	model.cleanIssues();
+	drawChart();
+	loadYoloData();
+}
+
+function toggle_visibility(id) {
+   var e = document.getElementById(id);
+   if(e.style.display == 'block')
+      e.style.display = 'none';
+   else
+      e.style.display = 'block';
+}
+
+// initial load
+drawChart();
+loadYoloData();
+
+
+</script>
+
+
+</html>
