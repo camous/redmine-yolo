@@ -27,7 +27,11 @@ var activityViewModel = function (data){
 var issuesViewModel = function(){
 	
 	var chart = $('#container').highcharts();
-	var date = ko.observable(moment().format('YYYY-MM-DD'));
+	
+	// 80% of time, times log are done the next day. 20% time for friday are done on monday.
+	var bestDate = moment().isoWeekday() == 1 ? moment().subtract(3, "days") : moment().subtract(1, "days");  
+	var date = ko.observable(bestDate.format('YYYY-MM-DD'));
+	
 	var query = ko.observable('');
 	var projectId = ko.observable(''); 	// store the latest project id filtered, used when only one project is selected for adding times entries
 	var projectComment = ko.observable('');
